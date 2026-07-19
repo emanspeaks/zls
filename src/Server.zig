@@ -18,7 +18,8 @@ const offsets = @import("offsets.zig");
 const tracy = @import("tracy");
 const diff = @import("diff.zig");
 const Uri = @import("Uri.zig");
-const bsp = @import("bsp.zig");
+// const bsp = @import("bsp.zig");
+const bsp = @import("bsp_fallback.zig");
 const InternPool = @import("analyser/analyser.zig").InternPool;
 const DiagnosticsCollection = @import("DiagnosticsCollection.zig");
 
@@ -856,7 +857,7 @@ const Workspace = struct {
             error.Canceled => return error.Canceled,
             error.AlreadyReported => return,
             else => {
-                log.err("failed to initilize Build-On-Save for '{f}': {t}", .{ build_root, err });
+                log.err("failed to initialize Build-On-Save for '{f}': {t}", .{ build_root, err });
                 return;
             },
         };
@@ -1111,7 +1112,7 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
                 .supported => {},
                 .invalid_linux_kernel_version => |*utsname_release| log.warn("Build-On-Save cannot run in watch mode because the Linux version '{s}' could not be parsed", .{std.mem.sliceTo(utsname_release, 0)}),
                 .unsupported_linux_kernel_version => |kernel_version| log.warn("Build-On-Save cannot run in watch mode because it is not supported by Linux '{f}' (requires at least {f})", .{ kernel_version, BuildOnSave.Supported.minimum_linux_version }),
-                .unsupported_zig_version => log.warn("Build-On-Save cannot run in watch mode because it is not supported on {t} by Zig {f} (requires at least {f})", .{ zig_builtin.os.tag, server.resolved_config.zig_runtime_version.?, BuildOnSave.Supported.minimum_zig_version }),
+                .unsupported_zig_version => log.warn("Build-On-Save is disabled because Zig {f} does not include the build system protocol (ziglang/zig#36147)", .{server.config_manager.zig_exe.?.version}),
                 .unsupported_os => log.warn("Build-On-Save cannot run in watch mode because it is not supported on {t}", .{zig_builtin.os.tag}),
             }
         }

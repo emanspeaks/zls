@@ -13,7 +13,8 @@ const tracy = @import("tracy");
 const DocumentScope = @import("DocumentScope.zig");
 const DiagnosticsCollection = @import("DiagnosticsCollection.zig");
 const TrigramStore = @import("TrigramStore.zig");
-const bsp = @import("bsp.zig");
+// const bsp = @import("bsp.zig");
+const bsp = @import("bsp_fallback.zig");
 
 const DocumentStore = @This();
 

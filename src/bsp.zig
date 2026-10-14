@@ -344,6 +344,7 @@ fn loadBuildConfigurationInner(
     {
         var i: usize = all_steps.count();
 
+        try all_steps.ensureUnusedCapacity(gpa, configuration.steps.len);
         for (configuration.steps, 0..) |*conf_step, step_index_usize| {
             if (conf_step.owner != .root) continue;
             const step_index: Configuration.Step.Index = @fromBackingInt(@intCast(step_index_usize));

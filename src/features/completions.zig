@@ -262,6 +262,9 @@ fn declToCompletion(builder: *Builder, decl_handle: Analyser.DeclWithHandle) Ana
         }
         break :blk "";
     };
+    const is_deprecated = compile_error_message != null or decl_handle.isDeprecated();
+    const mark_deprecated_old = is_deprecated and builder.server.client_capabilities.supports_completion_deprecated_old;
+    const mark_deprecated_tag = is_deprecated and builder.server.client_capabilities.supports_completion_deprecated_tag;
 
     switch (decl_handle.decl) {
         .ast_node,
@@ -289,11 +292,12 @@ fn declToCompletion(builder: *Builder, decl_handle: Analyser.DeclWithHandle) Ana
                 break :blk if (decl_handle.isConst()) .Constant else .Variable;
             };
 
-            var is_deprecated: bool = false;
             if (maybe_resolved_ty) |ty| {
                 if (try builder.analyser.resolveFuncProtoOfCallable(ty)) |func_ty| blk: {
                     var item = try functionTypeCompletion(builder, name, decl_handle.container_type, func_ty) orelse break :blk;
                     item.documentation = documentation;
+                    if (mark_deprecated_old) item.deprecated = true;
+                    if (mark_deprecated_tag) item.tags = &.{.Deprecated};
                     builder.completions.appendAssumeCapacity(item);
                     return;
                 } else if (ty.isEnumType()) {
@@ -308,8 +312,6 @@ fn declToCompletion(builder: *Builder, decl_handle: Analyser.DeclWithHandle) Ana
                     kind = .TypeParameter;
                 } else if (ty.isEnumLiteral()) {
                     kind = .EnumMember;
-                } else if (ty.data == .compile_error) {
-                    is_deprecated = true;
                 }
             }
 
@@ -339,8 +341,8 @@ fn declToCompletion(builder: *Builder, decl_handle: Analyser.DeclWithHandle) Ana
                 } else documentation,
                 .detail = detail,
                 .labelDetails = label_details,
-                .deprecated = if (compile_error_message != null and builder.server.client_capabilities.supports_completion_deprecated_old) true else null,
-                .tags = if (compile_error_message != null and builder.server.client_capabilities.supports_completion_deprecated_tag) &.{.Deprecated} else null,
+                .deprecated = if (mark_deprecated_old) true else null,
+                .tags = if (mark_deprecated_tag) &.{.Deprecated} else null,
             });
         },
         .label => {
@@ -660,10 +662,7 @@ fn completeBuiltin(builder: *Builder) error{OutOfMemory}!void {
             builtin,
             builtin.parameters.len > 3,
         );
-        const is_deprecated =
-            std.mem.eql(u8, name, "@enumFromInt") or
-            std.mem.eql(u8, name, "@intFromEnum") or
-            std.mem.eql(u8, name, "@intFromFloat");
+        const is_deprecated = Analyser.isBuiltinDeprecated(name);
 
         builder.completions.appendAssumeCapacity(.{
             .label = name,

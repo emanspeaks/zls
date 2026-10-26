@@ -433,6 +433,7 @@ fn writeNodeTokens(builder: *Builder, node: Ast.Node.Index) Analyser.Error!void 
 
             const tok_mod: TokenModifiers = .{
                 .declaration = true,
+                .deprecated = Analyser.isNodeDeprecated(tree, node),
                 .generic = is_generic,
             };
 
@@ -723,11 +724,7 @@ fn writeNodeTokens(builder: *Builder, node: Ast.Node.Index) Analyser.Error!void 
             var buffer: [2]Ast.Node.Index = undefined;
             const params = tree.builtinCallParams(&buffer, node).?;
 
-            const name = offsets.identifierTokenToNameSlice(tree, main_token);
-            const is_deprecated =
-                std.mem.eql(u8, name, "enumFromInt") or
-                std.mem.eql(u8, name, "intFromEnum") or
-                std.mem.eql(u8, name, "intFromFloat");
+            const is_deprecated = Analyser.isBuiltinDeprecated(tree.tokenSlice(main_token));
 
             try writeTokenMod(builder, main_token, .builtin, .{ .deprecated = is_deprecated });
             for (params) |param|
@@ -992,7 +989,10 @@ fn writeContainerField(builder: *Builder, node: Ast.Node.Index, container_decl: 
 
     try writeToken(builder, container_field.comptime_token, .keyword);
     if (!container_field.ast.tuple_like) {
-        try writeTokenMod(builder, container_field.ast.main_token, field_token_type, .{ .declaration = true });
+        try writeTokenMod(builder, container_field.ast.main_token, field_token_type, .{
+            .declaration = true,
+            .deprecated = Analyser.isNodeDeprecated(tree, node),
+        });
     }
 
     if (container_field.ast.type_expr.unwrap()) |type_expr| {
@@ -1038,6 +1038,7 @@ fn writeVarDecl(builder: *Builder, var_decl_node: Ast.Node.Index, resolved_type:
             .{
                 .declaration = true,
                 .static = !(decl_type.is_type_val or decl_type.isFunc()) and try decl.isStatic(),
+                .deprecated = decl.isDeprecated(),
                 .mutable = mutable,
             },
         );
@@ -1049,6 +1050,7 @@ fn writeVarDecl(builder: *Builder, var_decl_node: Ast.Node.Index, resolved_type:
             .{
                 .declaration = true,
                 .static = try decl.isStatic(),
+                .deprecated = decl.isDeprecated(),
                 .mutable = mutable,
             },
         );
@@ -1107,6 +1109,7 @@ fn writeIdentifier(builder: *Builder, name_token: Ast.TokenIndex) Analyser.Error
                 is_param,
                 .{
                     .static = !(decl_type.is_type_val or decl_type.isFunc()) and try child.isStatic(),
+                    .deprecated = child.isDeprecated(),
                     .mutable = mutable,
                 },
             );
@@ -1117,6 +1120,7 @@ fn writeIdentifier(builder: *Builder, name_token: Ast.TokenIndex) Analyser.Error
                 if (is_param) .parameter else .variable,
                 .{
                     .static = try child.isStatic(),
+                    .deprecated = child.isDeprecated(),
                     .mutable = mutable,
                 },
             );
@@ -1159,7 +1163,7 @@ fn writeFieldAccess(builder: *Builder, node: Ast.Node.Index) Analyser.Error!void
                 lhs_type.is_type_val,
             ).?;
 
-            try writeTokenMod(builder, field_name_token, field_token_type, .{});
+            try writeTokenMod(builder, field_name_token, field_token_type, .{ .deprecated = decl_type.isDeprecated() });
             return;
         }
 
@@ -1171,6 +1175,7 @@ fn writeFieldAccess(builder: *Builder, node: Ast.Node.Index) Analyser.Error!void
             false,
             .{
                 .mutable = !decl_type.isConst(),
+                .deprecated = decl_type.isDeprecated(),
                 .static = !(resolved_type.is_type_val or resolved_type.isFunc()) and try decl_type.isStatic(),
             },
         );

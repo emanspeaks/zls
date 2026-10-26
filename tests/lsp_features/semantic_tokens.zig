@@ -2006,6 +2006,72 @@ test "deprecated" {
     });
 }
 
+test "deprecated doc comment" {
+    try testSemanticTokens(
+        \\/// Deprecated, use bar instead.
+        \\fn foo() void {}
+        \\const alpha = foo();
+    , &.{
+        .{ "/// Deprecated, use bar instead.", .comment, .{ .documentation = true } },
+        .{ "fn", .keyword, .{} },
+        .{ "foo", .function, .{ .declaration = true, .deprecated = true } },
+        .{ "void", .type, .{} },
+
+        .{ "const", .keyword, .{} },
+        .{ "alpha", .variable, .{ .declaration = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "foo", .function, .{ .deprecated = true } },
+    });
+    try testSemanticTokens(
+        \\const S = struct {
+        \\    /// Deprecated in favor of `bar`.
+        \\    const foo = 5;
+        \\    /// Deprecatedness is not implied by this line.
+        \\    const bar = 5;
+        \\};
+        \\const alpha = S.foo;
+        \\const beta = S.bar;
+    , &.{
+        .{ "const", .keyword, .{} },
+        .{ "S", .namespace, .{ .declaration = true } },
+        .{ "=", .operator, .{} },
+        .{ "struct", .keyword, .{} },
+
+        .{ "/// Deprecated in favor of `bar`.", .comment, .{ .documentation = true } },
+        .{ "const", .keyword, .{} },
+        .{ "foo", .variable, .{ .declaration = true, .deprecated = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "5", .number, .{} },
+
+        .{ "/// Deprecatedness is not implied by this line.", .comment, .{ .documentation = true } },
+        .{ "const", .keyword, .{} },
+        .{ "bar", .variable, .{ .declaration = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "5", .number, .{} },
+
+        .{ "const", .keyword, .{} },
+        .{ "alpha", .variable, .{ .declaration = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "S", .namespace, .{} },
+        .{ "foo", .variable, .{ .deprecated = true, .static = true } },
+
+        .{ "const", .keyword, .{} },
+        .{ "beta", .variable, .{ .declaration = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "S", .namespace, .{} },
+        .{ "bar", .variable, .{ .static = true } },
+    });
+    try testSemanticTokens(
+        \\const alpha = @intFromFloat(1.5);
+    , &.{
+        .{ "const", .keyword, .{} },
+        .{ "alpha", .variable, .{ .declaration = true, .static = true } },
+        .{ "=", .operator, .{} },
+        .{ "@intFromFloat", .builtin, .{ .deprecated = true } },
+        .{ "1.5", .number, .{} },
+    });
+}
+
 test "zon file" {
     try testSemanticTokensOptions(
         \\.{

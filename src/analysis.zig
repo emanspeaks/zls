@@ -104,6 +104,51 @@ pub fn getDocComments(allocator: std.mem.Allocator, tree: *const Ast, node: Ast.
     return null;
 }
 
+/// Whether a declaration's doc comments mark it as deprecated. There is no
+/// attribute for this, so follow the std convention of a doc comment line
+/// starting with `Deprecated` (e.g. `/// Deprecated, use foo instead.`).
+pub fn isNodeDeprecated(tree: *const Ast, node: Ast.Node.Index) bool {
+    switch (tree.nodeTag(node)) {
+        .fn_proto,
+        .fn_proto_one,
+        .fn_proto_simple,
+        .fn_proto_multi,
+        .fn_decl,
+        .local_var_decl,
+        .global_var_decl,
+        .aligned_var_decl,
+        .simple_var_decl,
+        .container_field_init,
+        .container_field_align,
+        .container_field,
+        => {},
+        else => return false,
+    }
+    var token = getDocCommentTokenIndex(tree, tree.nodeMainToken(node)) orelse return false;
+    while (tree.tokenTag(token) == .doc_comment) : (token += 1) {
+        if (isDeprecationNotice(tree.tokenSlice(token)[3..])) return true;
+    }
+    return false;
+}
+
+/// Whether the langref documentation of a builtin marks it as deprecated.
+/// `name` includes the leading `@`.
+pub fn isBuiltinDeprecated(name: []const u8) bool {
+    const data = version_data.builtins.get(name) orelse return false;
+    var lines = std.mem.splitScalar(u8, data.documentation, '\n');
+    while (lines.next()) |line| {
+        if (isDeprecationNotice(line)) return true;
+    }
+    return false;
+}
+
+fn isDeprecationNotice(line: []const u8) bool {
+    const text = std.mem.trimStart(u8, line, " \t");
+    if (!std.mem.startsWith(u8, text, "Deprecated")) return false;
+    const rest = text["Deprecated".len..];
+    return rest.len == 0 or !std.ascii.isAlphanumeric(rest[0]);
+}
+
 /// Get the first doc comment of a declaration.
 pub fn getDocCommentTokenIndex(tree: *const Ast, base_token: Ast.TokenIndex) ?Ast.TokenIndex {
     var idx = base_token;
@@ -5814,6 +5859,13 @@ pub const DeclWithHandle = struct {
             },
             .error_token => |token| try getDocCommentsBeforeToken(allocator, tree, token),
             else => null,
+        };
+    }
+
+    pub fn isDeprecated(self: DeclWithHandle) bool {
+        return switch (self.decl) {
+            .ast_node => |node| isNodeDeprecated(&self.handle.tree, node),
+            else => false,
         };
     }
 

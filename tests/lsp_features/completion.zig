@@ -3008,6 +3008,43 @@ test "deprecated" {
     });
 }
 
+test "deprecated doc comment" {
+    try testCompletion(
+        \\/// Deprecated, use bar instead.
+        \\const foo = 5;
+        \\const baz = <cursor>
+    , &.{
+        .{
+            .label = "foo",
+            .kind = .Constant,
+            .documentation = "Deprecated, use bar instead.",
+            .deprecated = true,
+        },
+    });
+    try testCompletionWithOptions(
+        \\pub const Test = struct {
+        \\  /// Deprecated in favor of `b`.
+        \\  pub fn a() void {}
+        \\  pub fn b() void {}
+        \\};
+        \\const foo = Test.<cursor>
+    , &.{
+        .{
+            .label = "b",
+            .kind = .Function,
+            .deprecated = false,
+        },
+        .{
+            .label = "a",
+            .kind = .Function,
+            .documentation = "Deprecated in favor of `b`.",
+            .deprecated = true,
+        },
+    }, .{
+        .check_order = true,
+    });
+}
+
 test "deprecated sorting" {
     try testCompletionWithOptions(
         \\pub const Test = struct {

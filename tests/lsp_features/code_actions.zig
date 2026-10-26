@@ -462,6 +462,38 @@ test "remove capture" {
     , .{ .filter_title = "remove capture" });
 }
 
+test "add parentheses for ambiguous operator precedence" {
+    try testDiagnostic(
+        \\test {
+        \\    _ = foo == bar() catch unreachable;
+        \\}
+    ,
+        \\test {
+        \\    _ = foo == (bar() catch unreachable);
+        \\}
+    , .{ .filter_title = "add parentheses (zig 0.17.x precedence)" });
+    try testDiagnostic(
+        \\test {
+        \\    _ = foo and bar or baz;
+        \\}
+    ,
+        \\test {
+        \\    _ = (foo and bar) or baz;
+        \\}
+    , .{ .filter_title = "add parentheses (zig 0.17.x precedence)" });
+    try testDiagnostic(
+        \\test {
+        \\    _ = foo orelse bar + 1;
+        \\    _ = foo == bar orelse baz;
+        \\}
+    ,
+        \\test {
+        \\    _ = foo orelse (bar + 1);
+        \\    _ = foo == (bar orelse baz);
+        \\}
+    , .{ .filter_title = "add parentheses to all ambiguous operators (zig 0.17.x precedence)" });
+}
+
 test "organize imports" {
     try testOrganizeImports(
         \\const xyz = @import("xyz.zig");

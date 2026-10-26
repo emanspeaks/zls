@@ -34,12 +34,7 @@ pub fn @"textDocument/codeAction"(server: *Server, arena: std.mem.Allocator, req
     };
     const handle = server.document_store.getHandle(document_uri) orelse return null;
 
-    // as of right now, only ast-check errors may get a code action
-    if (handle.tree.errors.len != 0) return null;
     if (handle.tree.mode == .zon) return null;
-
-    var error_bundle = try diagnostics_gen.getAstCheckDiagnostics(server, handle);
-    defer error_bundle.deinit(server.allocator);
 
     var analyser = server.initAnalyser(arena, handle);
     defer analyser.deinit();
@@ -60,8 +55,17 @@ pub fn @"textDocument/codeAction"(server: *Server, arena: std.mem.Allocator, req
         .only_kinds = only_kinds,
     };
 
-    try builder.generateCodeAction(error_bundle);
-    try builder.generateCodeActionsInRange(request.range);
+    if (handle.tree.errors.len != 0) {
+        // ast-check requires an error-free tree, but ambiguous operator
+        // precedence errors still produce a complete tree to fix up
+        try builder.generateOperatorPrecedenceCodeActions(request.range);
+    } else {
+        var error_bundle = try diagnostics_gen.getAstCheckDiagnostics(server, handle);
+        defer error_bundle.deinit(server.allocator);
+
+        try builder.generateCodeAction(error_bundle);
+        try builder.generateCodeActionsInRange(request.range);
+    }
 
     const result = try arena.alloc(types.CodeAction.Result, builder.actions.items.len);
     for (builder.actions.items, result) |action, *out| {
@@ -166,6 +170,69 @@ pub const Builder = struct {
             .multiline_string_literal_line => try generateMultilineStringCodeActions(builder, token_idx),
             .string_literal => try generateStringLiteralCodeActions(builder, token_idx),
             else => {},
+        }
+    }
+
+    /// Offers to parenthesize expressions that are ambiguous under the partially
+    /// ordered operator precedence, preserving how zig 0.17.x evaluated them.
+    pub fn generateOperatorPrecedenceCodeActions(
+        builder: *Builder,
+        range: types.Range,
+    ) error{OutOfMemory}!void {
+        const tracy_zone = tracy.trace(@src());
+        defer tracy_zone.end();
+
+        if (!builder.wantKind(.quickfix)) return;
+
+        const tree = &builder.handle.tree;
+
+        // the hint notes identify the operator whose node the parser built
+        // with 0.17.x precedence and therefore needs the parentheses
+        var operators: std.AutoHashMapUnmanaged(Ast.TokenIndex, void) = .empty;
+        for (tree.errors) |err| {
+            const operator_token = switch (err.tag) {
+                .hint_operator_precedence_left => err.token - @as(Ast.TokenIndex, @intCast(err.extra.offset)),
+                .hint_operator_precedence_right => err.token,
+                else => continue,
+            };
+            try operators.put(builder.arena, operator_token, {});
+        }
+        if (operators.count() == 0) return;
+
+        const request_loc: offsets.Loc = .{
+            .start = offsets.positionToIndex(tree.source, range.start, builder.offset_encoding),
+            .end = offsets.positionToIndex(tree.source, range.end, builder.offset_encoding),
+        };
+
+        var all_edits: std.ArrayList(types.TextEdit) = .empty;
+
+        for (tree.nodes.items(.main_token), 0..) |main_token, i| {
+            if (!operators.contains(main_token)) continue;
+            const node: Ast.Node.Index = @fromBackingInt(@intCast(i));
+            const loc = offsets.nodeToLoc(tree, node);
+
+            const edits = [_]types.TextEdit{
+                builder.createTextEditPos(loc.start, "("),
+                builder.createTextEditPos(loc.end, ")"),
+            };
+            try all_edits.appendSlice(builder.arena, &edits);
+
+            if (loc.start <= request_loc.end and request_loc.start <= loc.end) {
+                try builder.actions.append(builder.arena, .{
+                    .title = "add parentheses (zig 0.17.x precedence)",
+                    .kind = .quickfix,
+                    .isPreferred = true,
+                    .edit = try builder.createWorkspaceEdit(&edits),
+                });
+            }
+        }
+
+        if (all_edits.items.len > 2) {
+            try builder.actions.append(builder.arena, .{
+                .title = "add parentheses to all ambiguous operators (zig 0.17.x precedence)",
+                .kind = .quickfix,
+                .edit = try builder.createWorkspaceEdit(all_edits.items),
+            });
         }
     }
 
@@ -1214,7 +1281,7 @@ fn getDiscardLoc(tree: *const Ast, loc: offsets.Loc) ?offsets.Loc {
     if (!std.mem.startsWith(u8, tree.source[autofix_comment_start..], "//")) return null;
     const autofix_str_start = std.mem.findNonePos(u8, tree.source, autofix_comment_start + "//".len, " ") orelse return null;
     if (!std.mem.startsWith(u8, tree.source[autofix_str_start..], "autofix")) return null;
-    const autofix_comment_end = std.mem.findNonePos(u8, tree.source, autofix_str_start + "autofix".len, " ") orelse autofix_str_start + "autofix".len;
+    const autofix_comment_end = std.mem.findNonePos(u8, tree.source, autofix_str_start + "autofix".len, " ") orelse (autofix_str_start + "autofix".len);
 
     // move backwards until we find a newline
     const start_position = found: {

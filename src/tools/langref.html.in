@@ -5175,7 +5175,7 @@ fn cmpxchgWeakButNotAtomic(comptime T: type, ptr: *T, expected_value: T, new_val
       Creates a column-major matrix of {#syntax#}cols{#endsyntax#} columns, each a {#syntax#}@Vector(rows, Element){#endsyntax#}.
       {#syntax#}Element{#endsyntax#} must be a float type. A matrix coerces to and from {#syntax#}[cols][rows]Element{#endsyntax#}.
       </p>
-      {#see_also|@Vector#}
+      {#see_also|@Vector|@transpose#}
       {#header_close#}
 
       {#header_open|@max#}
@@ -5813,6 +5813,14 @@ fn cmpxchgWeakButNotAtomic(comptime T: type, ptr: *T, expected_value: T, new_val
       <p>
       When {#syntax#}@This(){#endsyntax#} is used at file scope, it returns a reference to the
       struct that corresponds to the current file.
+      </p>
+      {#header_close#}
+
+      {#header_open|@transpose#}
+      <pre>{#syntax#}@transpose(matrix: anytype) anytype{#endsyntax#}</pre>
+      <p>
+      Returns the transpose of a {#link|@Matrix#}: the columns of {#syntax#}@Matrix(rows, cols, T){#endsyntax#}
+      become the rows of a {#syntax#}@Matrix(cols, rows, T){#endsyntax#}.
       </p>
       {#header_close#}
 

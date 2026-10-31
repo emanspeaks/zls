@@ -42,8 +42,6 @@ jobs:
 
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         if: env.SKIP_DEPLOY != 'true'
-        with:
-          version: master
 
       - name: Install APT packages
         if: env.SKIP_DEPLOY != 'true'
@@ -54,8 +52,9 @@ jobs:
       - name: Install minisign
         if: env.SKIP_DEPLOY != 'true'
         run: |
-          wget https://github.com/jedisct1/minisign/releases/download/0.11/minisign-0.11-linux.tar.gz
-          tar -xf minisign-0.11-linux.tar.gz --directory ${HOME}
+          wget https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz
+          echo "9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73  minisign-0.12-linux.tar.gz" | sha256sum --check
+          tar -xf minisign-0.12-linux.tar.gz --directory ${HOME}
           echo "${HOME}/minisign-linux/x86_64/" >> $GITHUB_PATH
 
       - name: Build release artifacts

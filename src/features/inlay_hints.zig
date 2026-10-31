@@ -19,7 +19,8 @@ pub const Error = Analyser.Error || error{InvalidParams};
 
 /// don't show inlay hints for builtin functions whose parameter names carry no
 /// meaningful information or are trivial deductible based on the builtin name.
-const excluded_builtins_set: std.EnumArray(std.zig.BuiltinFn.Tag, bool) = .init(.{
+// `false` covers builtins that only some compilers have, such as zig-build randy-matrix's `@Matrix`
+const excluded_builtins_set: std.EnumArray(std.zig.BuiltinFn.Tag, bool) = .initDefault(false, .{
     .add_with_overflow = true,
     .addrspace_cast = true,
     .align_cast = true,

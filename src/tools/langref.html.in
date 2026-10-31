@@ -5169,6 +5169,15 @@ fn cmpxchgWeakButNotAtomic(comptime T: type, ptr: *T, expected_value: T, new_val
       {#see_also|@ptrFromInt#}
       {#header_close#}
 
+      {#header_open|@Matrix#}
+      <pre>{#syntax#}@Matrix(rows: comptime_int, cols: comptime_int, Element: type) type{#endsyntax#}</pre>
+      <p>
+      Creates a column-major matrix of {#syntax#}cols{#endsyntax#} columns, each a {#syntax#}@Vector(rows, Element){#endsyntax#}.
+      {#syntax#}Element{#endsyntax#} must be a float type. A matrix coerces to and from {#syntax#}[cols][rows]Element{#endsyntax#}.
+      </p>
+      {#see_also|@Vector#}
+      {#header_close#}
+
       {#header_open|@max#}
       <pre>{#syntax#}@max(...) T{#endsyntax#}</pre>
       <p>
